@@ -160,7 +160,7 @@
         v60: { 
             defaultRatio: 16, grind: "16 clks", temp: "93°C", time: "4:30", 
             targets: [30, 90, 145], 
-            finalSeconds: 270,
+            finalSeconds: 270, // 4:30
             getSteps: (v, coffee) => [
                 { t: "0:00 (Bloom)", val: Math.round(coffee * 2.5) },
                 { t: "0:30 (Vertida 2)", val: Math.round(v * 0.45) },
@@ -171,7 +171,7 @@
         french: { 
             defaultRatio: 13, grind: "23 clks", temp: "91°C", time: "4:00", 
             targets: [30], 
-            finalSeconds: 240,
+            finalSeconds: 240, // 4:00
             getSteps: (v, coffee) => [
                 { t: "0:00 (Início 50%)", val: Math.round(v * 0.50) },
                 { t: "0:30 (Completar)", val: v }
@@ -182,51 +182,44 @@
     let audioCtx = null;
     let timer, seconds = 0, isRunning = false;
 
-    // --- SISTEMA DE ÁUDIO RECONSTRUÍDO ---
     function initAudio() {
-        if (!audioCtx) {
-            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-        }
-        if (audioCtx.state === 'suspended') {
-            audioCtx.resume();
-        }
+        if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        if (audioCtx.state === 'suspended') audioCtx.resume();
     }
 
-    function playBeep(freq, duration, vol = 0.8) {
+    function playBeep(freq = 2800, duration = 0.2, volume = 1.0) {
         if (!audioCtx) return;
-        // Sempre tenta dar resume antes de tocar
-        if (audioCtx.state === 'suspended') audioCtx.resume();
-
+        initAudio();
         const osc = audioCtx.createOscillator();
         const gain = audioCtx.createGain();
-        
         osc.type = "sine";
         osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
-        
-        gain.gain.setValueAtTime(vol, audioCtx.currentTime);
-        gain.gain.linearRampToValueAtTime(0.01, audioCtx.currentTime + duration);
-        
+        gain.gain.setValueAtTime(volume, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + duration);
         osc.connect(gain);
         gain.connect(audioCtx.destination);
-        
-        osc.start(audioCtx.currentTime);
+        osc.start();
         osc.stop(audioCtx.currentTime + duration);
     }
 
+    // Alarme de Finalização (3 bips rápidos)
     function playFinishAlarm() {
-        playBeep(1200, 0.2, 1.0);
-        setTimeout(() => playBeep(1200, 0.2, 1.0), 300);
-        setTimeout(() => playBeep(1200, 0.4, 1.0), 600);
+        playBeep(1500, 0.3, 1.0);
+        setTimeout(() => playBeep(1500, 0.3, 1.0), 400);
+        setTimeout(() => playBeep(1500, 0.5, 1.0), 800);
     }
 
-    // --- CRONÔMETRO ---
+    function keepAudioAlive() {
+        if (isRunning && audioCtx) playBeep(440, 0.001, 0.001);
+    }
+
     function toggleTimer() {
         initAudio();
         if (!isRunning) {
             isRunning = true;
             document.getElementById('startBtn').innerText = "Rodando";
             document.getElementById('startBtn').classList.add('active');
-            playBeep(880, 0.1, 0.5); 
+            playBeep(440, 0.05, 0.5); 
             timer = setInterval(tick, 1000);
         }
     }
@@ -235,12 +228,14 @@
         seconds++;
         updateDisplay();
         checkAlerts();
+        if (seconds % 10 === 0) keepAudioAlive();
     }
 
     function checkAlerts() {
         const mKey = document.getElementById('method').value;
         const conf = CONFIG[mKey];
         
+        // Alerta de Finalização Exata
         if (seconds === conf.finalSeconds) {
             playFinishAlarm();
             document.body.classList.remove('warning-mode');
@@ -248,13 +243,14 @@
             return;
         }
 
+        // Alertas de Vertidas
         let isWarning = false;
         conf.targets.forEach(target => {
             const diff = target - seconds;
             if (diff >= 0 && diff <= 5) {
                 isWarning = true;
-                if (diff === 0) playBeep(1800, 0.4, 1.0); 
-                else playBeep(2500, 0.1, 0.8); 
+                if (diff === 0) playBeep(2000, 0.4, 1.0); 
+                else playBeep(3200, 0.12, 1.0); 
             }
         });
 
@@ -281,7 +277,6 @@
         document.getElementById('display').innerText = `${m.toString().padStart(2,'0')}:${s.toString().padStart(2,'0')}`;
     }
 
-    // --- LÓGICA DE PREPARO ---
     function updateDefaultRatio() {
         const m = document.getElementById('method').value;
         document.getElementById('ratio').value = CONFIG[m].defaultRatio;
@@ -294,7 +289,7 @@
     }
 
     function calculate() {
-        initAudio(); // Importante para iOS liberar o áudio
+        initAudio();
         const mKey = document.getElementById('method').value;
         const vol = parseFloat(document.getElementById('volume').value);
         const ratio = parseFloat(document.getElementById('ratio').value);
