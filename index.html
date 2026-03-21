@@ -19,7 +19,6 @@
             --accent: #d4a373; 
             --border: #222;
             --alert: #ff4d4d;
-            --success: #2d6a4f;
         }
 
         * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -32,11 +31,10 @@
             display: flex;
             justify-content: center;
             padding: env(safe-area-inset-top) 20px 40px 20px;
-            transition: background-color 0.3s;
+            transition: background-color 0.2s;
         }
 
         body.warning-mode { background-color: #2a0a0a; }
-        body.finish-mode { background-color: #0a2a1a; }
 
         .container {
             width: 100%;
@@ -47,11 +45,9 @@
             box-shadow: 0 20px 50px rgba(0,0,0,0.6);
             margin-top: 10px;
             border: 1px solid var(--border);
-            transition: all 0.3s;
         }
 
-        .warning-mode .container { border-color: var(--alert); }
-        .finish-mode .container { border-color: var(--success); }
+        .warning-mode .container { border-color: var(--alert); box-shadow: 0 0 20px rgba(255, 77, 77, 0.2); }
 
         header { text-align: center; margin-bottom: 25px; }
         h2 { color: var(--accent); margin: 0; font-size: 1.8rem; font-weight: 800; letter-spacing: -0.5px; }
@@ -69,7 +65,9 @@
             color: #fff;
             font-size: 1rem;
             outline: none;
+            transition: all 0.2s;
         }
+        input:focus { border-color: var(--accent); background: #252525; }
 
         .row { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
         .button-group { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-top: 25px; }
@@ -80,9 +78,8 @@
 
         .timer-display { text-align: center; font-size: 4.5rem; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, monospace; color: var(--accent); margin: 10px 0; font-weight: 800; letter-spacing: -2px; }
         .warning-mode .timer-display { color: var(--alert); animation: pulse 0.5s infinite alternate; }
-        .finish-mode .timer-display { color: #4ade80; }
 
-        @keyframes pulse { from { opacity: 1; } to { opacity: 0.5; } }
+        @keyframes pulse { from { opacity: 1; transform: scale(1); } to { opacity: 0.8; transform: scale(0.98); } }
 
         .timer-controls { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-bottom: 30px; }
         .btn-timer { padding: 12px; font-size: 0.8rem; background: #222; color: #fff; border: 1px solid var(--border); border-radius: 10px; }
@@ -160,7 +157,6 @@
         v60: { 
             defaultRatio: 16, grind: "16 clks", temp: "93°C", time: "4:30", 
             targets: [30, 90, 145], 
-            finalSeconds: 270, // 4:30
             getSteps: (v, coffee) => [
                 { t: "0:00 (Bloom)", val: Math.round(coffee * 2.5) },
                 { t: "0:30 (Vertida 2)", val: Math.round(v * 0.45) },
@@ -171,7 +167,6 @@
         french: { 
             defaultRatio: 13, grind: "23 clks", temp: "91°C", time: "4:00", 
             targets: [30], 
-            finalSeconds: 240, // 4:00
             getSteps: (v, coffee) => [
                 { t: "0:00 (Início 50%)", val: Math.round(v * 0.50) },
                 { t: "0:30 (Completar)", val: v }
@@ -182,35 +177,41 @@
     let audioCtx = null;
     let timer, seconds = 0, isRunning = false;
 
+    // --- Audio Engine Avançado para iOS ---
     function initAudio() {
-        if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-        if (audioCtx.state === 'suspended') audioCtx.resume();
+        if (!audioCtx) {
+            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        }
+        if (audioCtx.state === 'suspended') {
+            audioCtx.resume();
+        }
     }
 
     function playBeep(freq = 2800, duration = 0.2, volume = 1.0) {
         if (!audioCtx) return;
         initAudio();
+
         const osc = audioCtx.createOscillator();
         const gain = audioCtx.createGain();
+        
         osc.type = "sine";
         osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+        
         gain.gain.setValueAtTime(volume, audioCtx.currentTime);
         gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + duration);
+        
         osc.connect(gain);
         gain.connect(audioCtx.destination);
+        
         osc.start();
         osc.stop(audioCtx.currentTime + duration);
     }
 
-    // Alarme de Finalização (3 bips rápidos)
-    function playFinishAlarm() {
-        playBeep(1500, 0.3, 1.0);
-        setTimeout(() => playBeep(1500, 0.3, 1.0), 400);
-        setTimeout(() => playBeep(1500, 0.5, 1.0), 800);
-    }
-
+    // Mantém o hardware de áudio do iOS acordado durante o silêncio
     function keepAudioAlive() {
-        if (isRunning && audioCtx) playBeep(440, 0.001, 0.001);
+        if (isRunning && audioCtx) {
+            playBeep(440, 0.001, 0.001); // Bip quase inaudível
+        }
     }
 
     function toggleTimer() {
@@ -219,7 +220,7 @@
             isRunning = true;
             document.getElementById('startBtn').innerText = "Rodando";
             document.getElementById('startBtn').classList.add('active');
-            playBeep(440, 0.05, 0.5); 
+            playBeep(440, 0.05, 0.5); // Feedback imediato de início
             timer = setInterval(tick, 1000);
         }
     }
@@ -228,34 +229,29 @@
         seconds++;
         updateDisplay();
         checkAlerts();
+        
+        // A cada 10 segundos, envia um pulso para o iOS não dormir
         if (seconds % 10 === 0) keepAudioAlive();
     }
 
     function checkAlerts() {
-        const mKey = document.getElementById('method').value;
-        const conf = CONFIG[mKey];
-        
-        // Alerta de Finalização Exata
-        if (seconds === conf.finalSeconds) {
-            playFinishAlarm();
-            document.body.classList.remove('warning-mode');
-            document.body.classList.add('finish-mode');
-            return;
-        }
-
-        // Alertas de Vertidas
+        const m = document.getElementById('method').value;
+        const targets = CONFIG[m].targets;
         let isWarning = false;
-        conf.targets.forEach(target => {
+
+        targets.forEach(target => {
             const diff = target - seconds;
+            // Alerta de 5 a 1 segundo ANTES, e no segundo 0 (Ação)
             if (diff >= 0 && diff <= 5) {
                 isWarning = true;
+                // No segundo 0 o tom é diferente (mais longo/grave)
                 if (diff === 0) playBeep(2000, 0.4, 1.0); 
                 else playBeep(3200, 0.12, 1.0); 
             }
         });
 
         if (isWarning) document.body.classList.add('warning-mode');
-        else if (seconds < conf.finalSeconds) document.body.classList.remove('warning-mode');
+        else document.body.classList.remove('warning-mode');
     }
 
     function pauseTimer() {
@@ -269,7 +265,6 @@
     function resetTimer() {
         pauseTimer(); seconds = 0; updateDisplay();
         document.getElementById('startBtn').innerText = "Iniciar";
-        document.body.classList.remove('finish-mode');
     }
 
     function updateDisplay() {
