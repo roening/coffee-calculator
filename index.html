@@ -34,6 +34,7 @@
             transition: background-color 0.3s;
         }
 
+        /* Classe de Alerta Visual */
         body.warning-mode { background-color: #2a0a0a; }
 
         .container {
@@ -44,9 +45,10 @@
             border-radius: 20px;
             box-shadow: 0 20px 50px rgba(0,0,0,0.6);
             margin-top: 20px;
+            transition: transform 0.2s;
         }
 
-        .warning-mode .container { border: 1px solid var(--alert); }
+        .warning-mode .container { transform: scale(1.02); border: 1px solid var(--alert); }
 
         h2 { text-align: center; color: var(--accent); margin: 0 0 30px 0; font-size: 1.5rem; font-weight: 700; }
         .form-group { margin-bottom: 20px; }
@@ -64,12 +66,14 @@
         }
 
         .row { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+
         .button-group { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin: 25px 0 0 0; }
         button { padding: 16px; border: none; border-radius: 12px; font-size: 0.95rem; font-weight: 700; cursor: pointer; }
         .btn-calc { background-color: var(--accent); color: #000; }
         .btn-clear { background-color: #2a2a2a; color: var(--dim); }
 
-        .timer-display { text-align: center; font-size: 4rem; font-family: monospace; color: var(--accent); margin: 15px 0; font-weight: bold; }
+        /* Timer */
+        .timer-display { text-align: center; font-size: 4rem; font-family: monospace; color: var(--accent); margin: 15px 0; font-weight: bold; transition: color 0.2s; }
         .warning-mode .timer-display { color: var(--alert); animation: pulse 1s infinite; }
 
         @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
@@ -77,6 +81,7 @@
         .timer-controls { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-bottom: 30px; }
         .btn-timer { padding: 10px; font-size: 0.75rem; background: #222; color: #fff; border: 1px solid var(--border); border-radius: 8px; }
 
+        /* Resultados */
         #results { margin-top: 35px; display: none; border-top: 1px solid var(--border); padding-top: 20px; }
         .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 25px; }
         .item { background: #1e1e1e; padding: 12px; border-radius: 12px; text-align: center; border: 1px solid #252525; }
@@ -142,10 +147,11 @@
 </div>
 
 <script>
+    // --- Lógica de Barista ---
     const CONFIG = {
         v60: { 
             defaultRatio: 16, grind: "16 clks", temp: "92-94°C", time: "4:30", 
-            targets: [30, 90, 145], 
+            targets: [30, 90, 145], // Segundos: 0:30, 1:30, 2:25
             getSteps: (v, coffee) => [
                 { t: "0:00 (Bloom)", val: Math.round(coffee * 2.5) },
                 { t: "0:30 (V2)", val: Math.round(v * 0.45) },
@@ -155,7 +161,7 @@
         },
         french: { 
             defaultRatio: 13, grind: "23 clks", temp: "90-92°C", time: "4:00", 
-            targets: [30], 
+            targets: [30], // Apenas a segunda vertida
             getSteps: (v, coffee) => [
                 { t: "0:00 (50%)", val: Math.round(v * 0.50) },
                 { t: "0:30 (100%)", val: v }
@@ -163,25 +169,10 @@
         }
     };
 
-    // --- Audio System (Ajustado para iOS) ---
+    // --- Audio System (Oscilador Sintético) ---
     let audioCtx = null;
-
-    function initAudio() {
-        if (!audioCtx) {
-            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-        }
-        // Se o contexto estiver suspenso (comum no iOS), tenta retomar
-        if (audioCtx.state === 'suspended') {
-            audioCtx.resume();
-        }
-    }
-
     function playBeep(freq = 880, duration = 0.1) {
-        if (!audioCtx) return;
-        
-        // Garante que o contexto esteja ativo antes de tocar
-        if (audioCtx.state === 'suspended') audioCtx.resume();
-
+        if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
         const osc = audioCtx.createOscillator();
         const gain = audioCtx.createGain();
         osc.type = "sine";
@@ -198,12 +189,9 @@
     let timer, seconds = 0, isRunning = false;
     
     function toggleTimer() {
-        initAudio(); // "Abençoa" o áudio no clique do usuário
-        
         if (!isRunning) {
-            // Toca um bip silencioso imediato para desbloquear o hardware
-            playBeep(440, 0.01); 
-            
+            // Inicializa áudio no primeiro clique (exigência do navegador)
+            if (!audioCtx) playBeep(0, 0); 
             isRunning = true;
             document.getElementById('startBtn').innerText = "Rodando";
             timer = setInterval(tick, 1000);
@@ -219,18 +207,22 @@
     function checkAlerts() {
         const method = document.getElementById('method').value;
         const targets = CONFIG[method].targets;
+        
         let isWarning = false;
-
         targets.forEach(target => {
             const diff = target - seconds;
+            // Se faltarem entre 1 e 5 segundos para a próxima vertida
             if (diff >= 1 && diff <= 5) {
                 isWarning = true;
-                playBeep(1200, 0.1); 
+                playBeep(1200, 0.15); // Bip mais agudo para o alerta
             }
         });
 
-        if (isWarning) document.body.classList.add('warning-mode');
-        else document.body.classList.remove('warning-mode');
+        if (isWarning) {
+            document.body.classList.add('warning-mode');
+        } else {
+            document.body.classList.remove('warning-mode');
+        }
     }
 
     function pauseTimer() {
@@ -250,7 +242,7 @@
         document.getElementById('display').innerText = `${m.toString().padStart(2,'0')}:${s.toString().padStart(2,'0')}`;
     }
 
-    // --- Lógica Principal ---
+    // --- Core Logic ---
     function updateDefaultRatio() {
         const m = document.getElementById('method').value;
         document.getElementById('ratio').value = CONFIG[m].defaultRatio;
@@ -263,12 +255,11 @@
     }
 
     function calculate() {
-        initAudio(); // Também tenta inicializar aqui por segurança
         const mKey = document.getElementById('method').value;
         const vol = parseFloat(document.getElementById('volume').value);
         const ratio = parseFloat(document.getElementById('ratio').value);
         
-        if (!vol) return;
+        if (!vol) { alert("Informe a água!"); return; }
 
         const conf = CONFIG[mKey];
         const coffee = roundBarista(vol / ratio);
