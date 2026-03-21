@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Brew Master Pro</title>
+    
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="BrewMaster">
+    <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2280%22>☕</text></svg>">
+
+    <style>
+        :root {
+            --bg: #0a0a0a;
+            --card: #161616;
+            --text: #efefef;
+            --dim: #888;
+            --accent: #d4a373; 
+            --border: #222;
+            --alert: #e63946;
+        }
+
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+        body {
+            font-family: -apple-system, system-ui, sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            margin: 0;
+            display: flex;
+            justify-content: center;
+            padding: env(safe-area-inset-top) 20px 40px 20px;
+            transition: background-color 0.3s;
+        }
+
+        /* Classe de Alerta Visual */
+        body.warning-mode { background-color: #2a0a0a; }
+
+        .container {
+            width: 100%;
+            max-width: 400px;
+            background: var(--card);
+            padding: 30px 25px;
+            border-radius: 20px;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.6);
+            margin-top: 20px;
+            transition: transform 0.2s;
+        }
+
+        .warning-mode .container { transform: scale(1.02); border: 1px solid var(--alert); }
+
+        h2 { text-align: center; color: var(--accent); margin: 0 0 30px 0; font-size: 1.5rem; font-weight: 700; }
+        .form-group { margin-bottom: 20px; }
+        label { display: block; font-size: 0.8rem; font-weight: 600; margin-bottom: 8px; color: var(--dim); text-transform: uppercase; }
+
+        select, input {
+            width: 100%;
+            padding: 15px;
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            background: #1e1e1e;
+            color: #fff;
+            font-size: 1rem;
+            outline: none;
+        }
+
+        .row { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+
+        .button-group { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin: 25px 0 0 0; }
+        button { padding: 16px; border: none; border-radius: 12px; font-size: 0.95rem; font-weight: 700; cursor: pointer; }
+        .btn-calc { background-color: var(--accent); color: #000; }
+        .btn-clear { background-color: #2a2a2a; color: var(--dim); }
+
+        /* Timer */
+        .timer-display { text-align: center; font-size: 4rem; font-family: monospace; color: var(--accent); margin: 15px 0; font-weight: bold; transition: color 0.2s; }
+        .warning-mode .timer-display { color: var(--alert); animation: pulse 1s infinite; }
+
+        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
+
+        .timer-controls { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-bottom: 30px; }
+        .btn-timer { padding: 10px; font-size: 0.75rem; background: #222; color: #fff; border: 1px solid var(--border); border-radius: 8px; }
+
+        /* Resultados */
+        #results { margin-top: 35px; display: none; border-top: 1px solid var(--border); padding-top: 20px; }
+        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 25px; }
+        .item { background: #1e1e1e; padding: 12px; border-radius: 12px; text-align: center; border: 1px solid #252525; }
+        .item span { display: block; font-size: 0.65rem; color: var(--dim); text-transform: uppercase; margin-bottom: 4px; }
+        .item strong { font-size: 1.1rem; color: var(--accent); }
+
+        table { width: 100%; border-collapse: collapse; }
+        th { text-align: left; font-size: 0.75rem; color: var(--dim); padding-bottom: 10px; border-bottom: 1px solid var(--border); }
+        td { padding: 12px 0; border-bottom: 1px solid #222; font-size: 0.95rem; }
+        .val { font-weight: 700; color: var(--accent); text-align: right; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>Brew Master</h2>
+
+    <div class="form-group">
+        <label>Método</label>
+        <select id="method" onchange="updateDefaultRatio()">
+            <option value="v60">V60</option>
+            <option value="french">Prensa Francesa</option>
+        </select>
+    </div>
+
+    <div class="row">
+        <div class="form-group">
+            <label>Água (ml)</label>
+            <input type="number" id="volume" placeholder="---" inputmode="numeric">
+        </div>
+        <div class="form-group">
+            <label>Ratio (1:X)</label>
+            <input type="number" id="ratio" inputmode="decimal" step="0.1">
+        </div>
+    </div>
+
+    <div class="button-group">
+        <button class="btn-calc" onclick="calculate()">Calcular</button>
+        <button class="btn-clear" onclick="clearAll()">Limpar</button>
+    </div>
+
+    <div id="results">
+        <div class="timer-display" id="display">00:00</div>
+        <div class="timer-controls">
+            <button class="btn-timer" id="startBtn" onclick="toggleTimer()">Iniciar</button>
+            <button class="btn-timer" onclick="pauseTimer()">Pausar</button>
+            <button class="btn-timer" onclick="resetTimer()">Zerar</button>
+        </div>
+
+        <div class="grid">
+            <div class="item"><span>Café</span><strong id="r-coffee">-</strong></div>
+            <div class="item"><span>Moagem</span><strong id="r-grind">-</strong></div>
+            <div class="item"><span>Água</span><strong id="r-temp">-</strong></div>
+            <div class="item"><span>Tempo</span><strong id="r-time">-</strong></div>
+        </div>
+
+        <label style="font-size: 0.7rem; margin-bottom: 10px; display: block;">Escala Acumulada (Balança)</label>
+        <table>
+            <thead><tr><th>Próxima Ação</th><th style="text-align: right;">Total</th></tr></thead>
+            <tbody id="r-table"></tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+    // --- Lógica de Barista ---
+    const CONFIG = {
+        v60: { 
+            defaultRatio: 16, grind: "16 clks", temp: "92-94°C", time: "4:30", 
+            targets: [30, 90, 145], // Segundos: 0:30, 1:30, 2:25
+            getSteps: (v, coffee) => [
+                { t: "0:00 (Bloom)", val: Math.round(coffee * 2.5) },
+                { t: "0:30 (V2)", val: Math.round(v * 0.45) },
+                { t: "1:30 (V3)", val: Math.round(v * 0.75) },
+                { t: "2:25 (Final)", val: v }
+            ]
+        },
+        french: { 
+            defaultRatio: 13, grind: "23 clks", temp: "90-92°C", time: "4:00", 
+            targets: [30], // Apenas a segunda vertida
+            getSteps: (v, coffee) => [
+                { t: "0:00 (50%)", val: Math.round(v * 0.50) },
+                { t: "0:30 (100%)", val: v }
+            ]
+        }
+    };
+
+    // --- Audio System (Oscilador Sintético) ---
+    let audioCtx = null;
+    function playBeep(freq = 880, duration = 0.1) {
+        if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = "sine";
+        osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+        gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + duration);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start();
+        osc.stop(audioCtx.currentTime + duration);
+    }
+
+    // --- Cronômetro ---
+    let timer, seconds = 0, isRunning = false;
+    
+    function toggleTimer() {
+        if (!isRunning) {
+            // Inicializa áudio no primeiro clique (exigência do navegador)
+            if (!audioCtx) playBeep(0, 0); 
+            isRunning = true;
+            document.getElementById('startBtn').innerText = "Rodando";
+            timer = setInterval(tick, 1000);
+        }
+    }
+
+    function tick() {
+        seconds++;
+        updateDisplay();
+        checkAlerts();
+    }
+
+    function checkAlerts() {
+        const method = document.getElementById('method').value;
+        const targets = CONFIG[method].targets;
+        
+        let isWarning = false;
+        targets.forEach(target => {
+            const diff = target - seconds;
+            // Se faltarem entre 1 e 5 segundos para a próxima vertida
+            if (diff >= 1 && diff <= 5) {
+                isWarning = true;
+                playBeep(1200, 0.15); // Bip mais agudo para o alerta
+            }
+        });
+
+        if (isWarning) {
+            document.body.classList.add('warning-mode');
+        } else {
+            document.body.classList.remove('warning-mode');
+        }
+    }
+
+    function pauseTimer() {
+        isRunning = false;
+        clearInterval(timer);
+        document.getElementById('startBtn').innerText = "Retomar";
+        document.body.classList.remove('warning-mode');
+    }
+
+    function resetTimer() {
+        pauseTimer(); seconds = 0; updateDisplay();
+        document.getElementById('startBtn').innerText = "Iniciar";
+    }
+
+    function updateDisplay() {
+        const m = Math.floor(seconds / 60), s = seconds % 60;
+        document.getElementById('display').innerText = `${m.toString().padStart(2,'0')}:${s.toString().padStart(2,'0')}`;
+    }
+
+    // --- Core Logic ---
+    function updateDefaultRatio() {
+        const m = document.getElementById('method').value;
+        document.getElementById('ratio').value = CONFIG[m].defaultRatio;
+        document.getElementById('results').style.display = 'none';
+        resetTimer();
+    }
+
+    function roundBarista(g) {
+        return g <= 30 ? Math.round(g * 2) / 2 : Math.round(g);
+    }
+
+    function calculate() {
+        const mKey = document.getElementById('method').value;
+        const vol = parseFloat(document.getElementById('volume').value);
+        const ratio = parseFloat(document.getElementById('ratio').value);
+        
+        if (!vol) { alert("Informe a água!"); return; }
+
+        const conf = CONFIG[mKey];
+        const coffee = roundBarista(vol / ratio);
+        
+        document.getElementById('r-coffee').innerText = (coffee % 1 === 0 ? coffee : coffee.toFixed(1)) + "g";
+        document.getElementById('r-grind').innerText = conf.grind;
+        document.getElementById('r-temp').innerText = conf.temp;
+        document.getElementById('r-time').innerText = conf.time;
+
+        document.getElementById('r-table').innerHTML = conf.getSteps(vol, coffee).map(s => `
+            <tr><td>${s.t}</td><td class="val">${s.val} ml</td></tr>
+        `).join('');
+
+        document.getElementById('results').style.display = 'block';
+        resetTimer();
+    }
+
+    function clearAll() {
+        document.getElementById('volume').value = "";
+        updateDefaultRatio();
+        document.getElementById('results').style.display = 'none';
+        resetTimer();
+    }
+
+    window.onload = updateDefaultRatio;
+</script>
+</body>
+</html>
