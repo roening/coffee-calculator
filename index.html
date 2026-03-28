@@ -71,7 +71,7 @@
             outline: none;
         }
 
-        .row { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+        .row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px; }
         .button-group { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-top: 25px; }
         
         button { padding: 18px; border: none; border-radius: 14px; font-size: 1rem; font-weight: 700; cursor: pointer; transition: all 0.2s; }
@@ -119,11 +119,15 @@
     <div class="row">
         <div class="form-group">
             <label>Água (ml)</label>
-            <input type="number" id="volume" placeholder="Ex: 450" inputmode="numeric">
+            <input type="number" id="volume" placeholder="Ex: 450" inputmode="numeric" oninput="onVolumeInput()">
+        </div>
+        <div class="form-group">
+            <label>Café (g)</label>
+            <input type="number" id="coffee" placeholder="Ex: 28" inputmode="decimal" step="0.5" oninput="onCoffeeInput()">
         </div>
         <div class="form-group">
             <label>Ratio (1:X)</label>
-            <input type="number" id="ratio" inputmode="decimal" step="0.1">
+            <input type="number" id="ratio" inputmode="decimal" step="0.1" oninput="onRatioInput()">
         </div>
     </div>
 
@@ -282,10 +286,43 @@
         document.getElementById('ratio').value = CONFIG[m].defaultRatio;
         document.getElementById('results').style.display = 'none';
         resetTimer();
+        onVolumeInput();
     }
 
     function roundBarista(g) {
         return g <= 30 ? Math.round(g * 2) / 2 : Math.round(g);
+    }
+
+    function formatCoffee(g) {
+        return g % 1 === 0 ? String(g) : g.toFixed(1);
+    }
+
+    let lastEdited = 'volume'; // track which field was last edited
+
+    function onVolumeInput() {
+        lastEdited = 'volume';
+        const vol = parseFloat(document.getElementById('volume').value);
+        const ratio = parseFloat(document.getElementById('ratio').value);
+        if (vol && ratio) {
+            document.getElementById('coffee').value = formatCoffee(roundBarista(vol / ratio));
+        }
+    }
+
+    function onCoffeeInput() {
+        lastEdited = 'coffee';
+        const coffee = parseFloat(document.getElementById('coffee').value);
+        const ratio = parseFloat(document.getElementById('ratio').value);
+        if (coffee && ratio) {
+            document.getElementById('volume').value = Math.round(coffee * ratio);
+        }
+    }
+
+    function onRatioInput() {
+        if (lastEdited === 'coffee') {
+            onCoffeeInput();
+        } else {
+            onVolumeInput();
+        }
     }
 
     function calculate() {
@@ -296,7 +333,7 @@
         if (!vol) return;
         const conf = CONFIG[mKey];
         const coffee = roundBarista(vol / ratio);
-        document.getElementById('r-coffee').innerText = (coffee % 1 === 0 ? coffee : coffee.toFixed(1)) + "g";
+        document.getElementById('r-coffee').innerText = formatCoffee(coffee) + "g";
         document.getElementById('r-grind').innerText = conf.grind;
         document.getElementById('r-temp').innerText = conf.temp;
         document.getElementById('r-time').innerText = conf.time;
@@ -309,6 +346,7 @@
 
     function clearAll() {
         document.getElementById('volume').value = "";
+        document.getElementById('coffee').value = "";
         updateDefaultRatio();
         document.getElementById('results').style.display = 'none';
         resetTimer();
