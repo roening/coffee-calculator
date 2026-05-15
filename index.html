@@ -226,12 +226,13 @@
             document.getElementById('startBtn').innerText = "Rodando";
             document.getElementById('startBtn').classList.add('active');
             playBeep(440, 0.05, 0.5); 
-            timer = setInterval(tick, 250);
+            timer = setInterval(tick, 1000);
         }
     }
 
     function getElapsedSeconds() {
-        if (!isRunning || !startedAt) return elapsedBeforePause;
+        if (!isRunning) return elapsedBeforePause;
+        if (!startedAt) return elapsedBeforePause;
         return elapsedBeforePause + Math.floor((Date.now() - startedAt) / 1000);
     }
 
@@ -244,7 +245,7 @@
         if (seconds % 10 === 0) keepAudioAlive();
     }
 
-    function checkAlerts(previousSeconds = seconds - 1) {
+    function checkAlerts(previousSeconds) {
         const mKey = document.getElementById('method').value;
         const conf = CONFIG[mKey];
         
