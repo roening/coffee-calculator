@@ -185,6 +185,7 @@
 
     let audioCtx = null;
     let timer, seconds = 0, isRunning = false;
+    let startedAt = null, elapsedBeforePause = 0, finishAlarmPlayed = false;
 
     function initAudio() {
         if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -220,28 +221,37 @@
     function toggleTimer() {
         initAudio();
         if (!isRunning) {
+            startedAt = Date.now();
             isRunning = true;
             document.getElementById('startBtn').innerText = "Rodando";
             document.getElementById('startBtn').classList.add('active');
             playBeep(440, 0.05, 0.5); 
-            timer = setInterval(tick, 1000);
+            timer = setInterval(tick, 250);
         }
     }
 
+    function getElapsedSeconds() {
+        if (!isRunning || !startedAt) return elapsedBeforePause;
+        return elapsedBeforePause + Math.floor((Date.now() - startedAt) / 1000);
+    }
+
     function tick() {
-        seconds++;
+        const previousSeconds = seconds;
+        seconds = getElapsedSeconds();
+        if (seconds === previousSeconds) return;
         updateDisplay();
-        checkAlerts();
+        checkAlerts(previousSeconds);
         if (seconds % 10 === 0) keepAudioAlive();
     }
 
-    function checkAlerts() {
+    function checkAlerts(previousSeconds = seconds - 1) {
         const mKey = document.getElementById('method').value;
         const conf = CONFIG[mKey];
         
-        // Alerta de Finalização Exata
-        if (seconds === conf.finalSeconds) {
+        // Alerta de Finalização (inclui retorno de background com salto de tempo)
+        if (!finishAlarmPlayed && previousSeconds < conf.finalSeconds && seconds >= conf.finalSeconds) {
             playFinishAlarm();
+            finishAlarmPlayed = true;
             document.body.classList.remove('warning-mode');
             document.body.classList.add('finish-mode');
             return;
@@ -263,15 +273,24 @@
     }
 
     function pauseTimer() {
+        seconds = getElapsedSeconds();
+        elapsedBeforePause = seconds;
+        startedAt = null;
         isRunning = false;
         clearInterval(timer);
+        updateDisplay();
         document.getElementById('startBtn').innerText = "Retomar";
         document.getElementById('startBtn').classList.remove('active');
         document.body.classList.remove('warning-mode');
     }
 
     function resetTimer() {
-        pauseTimer(); seconds = 0; updateDisplay();
+        pauseTimer();
+        seconds = 0;
+        elapsedBeforePause = 0;
+        startedAt = null;
+        finishAlarmPlayed = false;
+        updateDisplay();
         document.getElementById('startBtn').innerText = "Iniciar";
         document.body.classList.remove('finish-mode');
     }
