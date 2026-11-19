@@ -78,6 +78,28 @@
         .btn-calc { background-color: var(--accent); color: #000; }
         .btn-clear { background-color: #2a2a2a; color: var(--dim); }
 
+        /* Seletor de estilo CM401 */
+        .style-pills {
+            display: none;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 8px;
+            margin-bottom: 20px;
+        }
+        .style-pills.visible { display: grid; }
+        .pill-btn {
+            padding: 12px 8px;
+            font-size: 0.8rem;
+            border-radius: 12px;
+            background: #1e1e1e;
+            color: var(--dim);
+            border: 1px solid var(--border);
+        }
+        .pill-btn.active {
+            background: rgba(212, 163, 115, 0.15);
+            color: var(--accent);
+            border-color: var(--accent);
+        }
+
         .timer-display { text-align: center; font-size: 4.5rem; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, monospace; color: var(--accent); margin: 10px 0; font-weight: 800; letter-spacing: -2px; }
         .warning-mode .timer-display { color: var(--alert); animation: pulse 0.5s infinite alternate; }
         .finish-mode .timer-display { color: #4ade80; }
@@ -91,12 +113,65 @@
         #results { margin-top: 30px; display: none; border-top: 1px solid var(--border); padding-top: 25px; }
         .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 25px; }
         .item { background: #1e1e1e; padding: 14px; border-radius: 14px; text-align: center; border: 1px solid #252525; }
-        .item span { display: block; font-size: 0.6rem; color: var(--dim); text-transform: uppercase; margin-bottom: 4px; font-weight: 700; }
-        .item strong { font-size: 1.2rem; color: var(--accent); }
+        .item span.lbl { display: block; font-size: 0.6rem; color: var(--dim); text-transform: uppercase; margin-bottom: 4px; font-weight: 700; }
+        .item strong { font-size: 1.2rem; color: var(--accent); display: block; }
+        .sub-unit {
+            display: block;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, monospace;
+            font-size: 0.68rem;
+            color: var(--dim);
+            margin-top: 5px;
+            line-height: 1.3;
+        }
+
+        /* Card principal da CM401 */
+        .ninja-hero {
+            background: #1e1e1e;
+            border: 1px solid var(--accent);
+            border-radius: 16px;
+            padding: 16px;
+            margin-bottom: 14px;
+            text-align: center;
+        }
+        .ninja-hero .badge {
+            display: inline-block;
+            font-size: 0.65rem;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: #000;
+            background: var(--accent);
+            padding: 3px 10px;
+            border-radius: 20px;
+            margin-bottom: 8px;
+        }
+        .ninja-hero .func-title {
+            font-size: 1.35rem;
+            font-weight: 800;
+            color: #fff;
+            margin: 2px 0;
+        }
+        .ninja-hero .yield-line {
+            font-size: 1.05rem;
+            font-weight: 700;
+            color: var(--accent);
+            margin-top: 4px;
+        }
+        .ninja-warning {
+            background: rgba(255, 77, 77, 0.12);
+            border: 1px solid var(--alert);
+            color: #ff9999;
+            font-size: 0.75rem;
+            padding: 10px 12px;
+            border-radius: 12px;
+            margin-bottom: 14px;
+            line-height: 1.4;
+            display: none;
+        }
 
         table { width: 100%; border-collapse: collapse; }
         th { text-align: left; font-size: 0.7rem; color: var(--dim); padding-bottom: 10px; border-bottom: 1px solid var(--border); text-transform: uppercase; }
-        td { padding: 14px 0; border-bottom: 1px solid #222; font-size: 1rem; }
+        td { padding: 14px 0; border-bottom: 1px solid #222; font-size: 0.95rem; }
         .val { font-weight: 700; color: var(--accent); text-align: right; }
     </style>
 </head>
@@ -110,15 +185,22 @@
 
     <div class="form-group">
         <label>Método de Extração</label>
-        <select id="method" onchange="updateDefaultRatio()">
+        <select id="method" onchange="onMethodChange()">
             <option value="v60">V60 (Hario)</option>
             <option value="french">Prensa Francesa</option>
+            <option value="cm401">Ninja CM401</option>
         </select>
+    </div>
+
+    <div class="style-pills" id="cm401-styles">
+        <button type="button" class="pill-btn active" data-style="classic" onclick="setCm401Style('classic')">Classic</button>
+        <button type="button" class="pill-btn" data-style="rich" onclick="setCm401Style('rich')">Rich</button>
+        <button type="button" class="pill-btn" data-style="specialty" onclick="setCm401Style('specialty')">Specialty</button>
     </div>
 
     <div class="row">
         <div class="form-group">
-            <label>Água (ml)</label>
+            <label id="lbl-volume">Água (ml)</label>
             <input type="number" id="volume" placeholder="Ex: 450" inputmode="numeric" oninput="onVolumeInput()">
         </div>
         <div class="form-group">
@@ -137,29 +219,82 @@
     </div>
 
     <div id="results">
-        <div class="timer-display" id="display">00:00</div>
-        <div class="timer-controls">
-            <button class="btn-timer" id="startBtn" onclick="toggleTimer()">Iniciar</button>
-            <button class="btn-timer" onclick="pauseTimer()">Pausar</button>
-            <button class="btn-timer" onclick="resetTimer()">Zerar</button>
+        <!-- View Manual (V60 / Prensa Francesa) -->
+        <div id="manual-results">
+            <div class="timer-display" id="display">00:00</div>
+            <div class="timer-controls">
+                <button class="btn-timer" id="startBtn" onclick="toggleTimer()">Iniciar</button>
+                <button class="btn-timer" onclick="pauseTimer()">Pausar</button>
+                <button class="btn-timer" onclick="resetTimer()">Zerar</button>
+            </div>
+
+            <div class="grid">
+                <div class="item"><span class="lbl">Café Moído</span><strong id="r-coffee">-</strong></div>
+                <div class="item"><span class="lbl">Timemore C3</span><strong id="r-grind">-</strong></div>
+                <div class="item"><span class="lbl">Temp. Ideal</span><strong id="r-temp">-</strong></div>
+                <div class="item"><span class="lbl">Tempo Alvo</span><strong id="r-time">-</strong></div>
+            </div>
+
+            <label style="font-size: 0.7rem; margin-bottom: 10px; display: block; color: var(--accent)">Escala de Vertidas (Acumulado)</label>
+            <table>
+                <thead><tr><th>Etapa</th><th style="text-align: right;">Balança</th></tr></thead>
+                <tbody id="r-table"></tbody>
+            </table>
         </div>
 
-        <div class="grid">
-            <div class="item"><span>Café Moído</span><strong id="r-coffee">-</strong></div>
-            <div class="item"><span>Timemore C3</span><strong id="r-grind">-</strong></div>
-            <div class="item"><span>Temp. Ideal</span><strong id="r-temp">-</strong></div>
-            <div class="item"><span>Tempo Alvo</span><strong id="r-time">-</strong></div>
-        </div>
+        <!-- View Ninja CM401 -->
+        <div id="cm401-results" style="display: none;">
+            <div class="ninja-warning" id="n-warning"></div>
 
-        <label style="font-size: 0.7rem; margin-bottom: 10px; display: block; color: var(--accent)">Escala de Vertidas (Acumulado)</label>
-        <table>
-            <thead><tr><th>Etapa</th><th style="text-align: right;">Balança</th></tr></thead>
-            <tbody id="r-table"></tbody>
-        </table>
+            <div class="ninja-hero">
+                <span class="badge" id="n-style-badge">CLASSIC</span>
+                <div class="func-title" id="n-func">-</div>
+                <div class="yield-line" id="n-yield">-</div>
+                <span class="sub-unit" id="n-yield-sub">-</span>
+            </div>
+
+            <div class="grid">
+                <div class="item">
+                    <span class="lbl">Café Moído</span>
+                    <strong id="n-coffee">-</strong>
+                    <span class="sub-unit" id="n-scoop">-</span>
+                </div>
+                <div class="item">
+                    <span class="lbl">Timemore C3</span>
+                    <strong id="n-grind">-</strong>
+                    <span class="sub-unit" id="n-grind-sub">-</span>
+                </div>
+                <div class="item">
+                    <span class="lbl">Água no Tanque</span>
+                    <strong id="n-tank">-</strong>
+                    <span class="sub-unit" id="n-tank-sub">-</span>
+                </div>
+                <div class="item">
+                    <span class="lbl">Recipiente</span>
+                    <strong id="n-vessel">-</strong>
+                    <span class="sub-unit" id="n-vessel-sub">-</span>
+                </div>
+            </div>
+
+            <label style="font-size: 0.7rem; margin-bottom: 10px; display: block; color: var(--accent)">Checklist de Preparo</label>
+            <table>
+                <thead><tr><th>Ajuste</th><th style="text-align: right;">Configuração</th></tr></thead>
+                <tbody id="n-table"></tbody>
+            </table>
+        </div>
     </div>
 </div>
 
 <script>
+    const STORAGE_KEY = 'brewops_prefs_v1';
+
+    const DEFAULT_RATIOS = {
+        v60: 16,
+        french: 13,
+        cm401: 16,
+        cm401_specialty: 5
+    };
+
     const CONFIG = {
         v60: { 
             defaultRatio: 16, grind: "16 clks", temp: "93°C", time: "4:30", 
@@ -180,8 +315,57 @@
                 { t: "0:00 (Início 50%)", val: Math.round(v * 0.50) },
                 { t: "0:30 (Completar)", val: v }
             ]
+        },
+        cm401: {
+            defaultRatio: 16,
+            specialtyRatio: 5,
+            grind: "16 clks",
+            presets: [
+                { id: "cup", name: "Cup", classicMl: 281, classicOz: 9.5, richMl: 257, richOz: 8.7, scoopType: "small", manualScoops: "2–3 small", vessel: "Xícara", vesselSub: "Apoiar na bandeja" },
+                { id: "xl_cup", name: "XL Cup", classicMl: 340, classicOz: 11.5, richMl: 305, richOz: 10.3, scoopType: "small", manualScoops: "2–3 small", vessel: "Caneca", vesselSub: "Apoiar na bandeja" },
+                { id: "travel", name: "Travel Mug", classicMl: 414, classicOz: 14.0, richMl: 390, richOz: 13.2, scoopType: "small", manualScoops: "3–5 small", vessel: "Copo Térmico", vesselSub: "Recolher bandeja" },
+                { id: "xl_multi", name: "XL Multi-Serve", classicMl: 532, classicOz: 18.0, richMl: 473, richOz: 16.0, scoopType: "small", manualScoops: "3–5 small", vessel: "Caneca Grande", vesselSub: "Recolher bandeja" },
+                { id: "half", name: "Half Carafe", classicMl: 739, classicOz: 25.0, richMl: 675, richOz: 22.8, scoopType: "big", manualScoops: "3–4 big", vessel: "Jarra (½)", vesselSub: "Marca 5 xíc / 25 oz" },
+                { id: "full", name: "Full Carafe", classicMl: 1479, classicOz: 50.0, richMl: 1345, richOz: 45.5, scoopType: "big", manualScoops: "4–6 big", vessel: "Jarra Cheia", vesselSub: "Marca 10 xíc / 50 oz" }
+            ],
+            specialtyPreset: {
+                id: "specialty", name: "Specialty (4 oz)", yieldMl: 118, yieldOz: 4.0,
+                scoopType: "big", manualScoops: "2 big", vessel: "Xícara / Latte", vesselSub: "Base concentrada"
+            }
         }
     };
+
+    let state = {
+        method: 'v60',
+        cm401Style: 'classic',
+        ratios: { ...DEFAULT_RATIOS }
+    };
+
+    function loadPrefs() {
+        try {
+            const raw = localStorage.getItem(STORAGE_KEY);
+            if (!raw) return;
+            const parsed = JSON.parse(raw);
+            if (parsed.method && CONFIG[parsed.method]) state.method = parsed.method;
+            if (parsed.cm401Style && ['classic', 'rich', 'specialty'].includes(parsed.cm401Style)) {
+                state.cm401Style = parsed.cm401Style;
+            }
+            if (parsed.ratios && typeof parsed.ratios === 'object') {
+                state.ratios = { ...DEFAULT_RATIOS, ...parsed.ratios };
+            }
+        } catch (e) {}
+    }
+
+    function savePrefs() {
+        try {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+        } catch (e) {}
+    }
+
+    function getRatioKey(method, cmStyle) {
+        if (method === 'cm401' && cmStyle === 'specialty') return 'cm401_specialty';
+        return method;
+    }
 
     let audioCtx = null;
     let timer, seconds = 0, isRunning = false;
@@ -207,7 +391,6 @@
         osc.stop(audioCtx.currentTime + duration);
     }
 
-    // Alarme de Finalização (3 bips rápidos)
     function playFinishAlarm() {
         playBeep(1500, 0.3, 1.0);
         setTimeout(() => playBeep(1500, 0.3, 1.0), 400);
@@ -248,8 +431,8 @@
     function checkAlerts(previousSeconds) {
         const mKey = document.getElementById('method').value;
         const conf = CONFIG[mKey];
+        if (!conf || !conf.finalSeconds) return;
         
-        // Alerta de Finalização (inclui retorno de background com salto de tempo)
         if (!finishAlarmPlayed && previousSeconds < conf.finalSeconds && seconds >= conf.finalSeconds) {
             playFinishAlarm();
             finishAlarmPlayed = true;
@@ -258,7 +441,6 @@
             return;
         }
 
-        // Alertas de Vertidas
         let isWarning = false;
         conf.targets.forEach(target => {
             const diff = target - seconds;
@@ -301,9 +483,51 @@
         document.getElementById('display').innerText = `${m.toString().padStart(2,'0')}:${s.toString().padStart(2,'0')}`;
     }
 
-    function updateDefaultRatio() {
-        const m = document.getElementById('method').value;
-        document.getElementById('ratio').value = CONFIG[m].defaultRatio;
+    function syncStylePills() {
+        document.querySelectorAll('#cm401-styles .pill-btn').forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.style === state.cm401Style);
+        });
+    }
+
+    function applyMethodUI() {
+        const m = state.method;
+        const isCm = m === 'cm401';
+
+        document.getElementById('method').value = m;
+        document.getElementById('cm401-styles').classList.toggle('visible', isCm);
+        syncStylePills();
+
+        document.getElementById('lbl-volume').innerText = isCm ? "Desejado (ml)" : "Água (ml)";
+        document.getElementById('volume').placeholder = isCm ? "Ex: 270" : "Ex: 450";
+
+        const ratioKey = getRatioKey(m, state.cm401Style);
+        document.getElementById('ratio').value = state.ratios[ratioKey] ?? DEFAULT_RATIOS[ratioKey];
+    }
+
+    function setCm401Style(style) {
+        state.cm401Style = style;
+        syncStylePills();
+
+        const ratioKey = getRatioKey('cm401', style);
+        document.getElementById('ratio').value = state.ratios[ratioKey] ?? DEFAULT_RATIOS[ratioKey];
+
+        const volInput = document.getElementById('volume');
+        if (style === 'specialty' && !volInput.value) {
+            volInput.value = 118;
+        }
+
+        savePrefs();
+        onVolumeInput();
+        if (document.getElementById('results').style.display === 'block') {
+            renderCm401();
+        }
+    }
+
+    function onMethodChange() {
+        state.method = document.getElementById('method').value;
+        applyMethodUI();
+        savePrefs();
+
         document.getElementById('results').style.display = 'none';
         resetTimer();
         onVolumeInput();
@@ -317,27 +541,110 @@
         return g % 1 === 0 ? String(g) : g.toFixed(1);
     }
 
-    let lastEdited = 'volume'; // track which field was last edited
+    // Seleciona o menor preset CM401 cujo rendimento seja >= desiredMl
+    function resolveCm401Preset(desiredMl) {
+        if (state.cm401Style === 'specialty') {
+            const sp = CONFIG.cm401.specialtyPreset;
+            return {
+                name: sp.name,
+                yieldMl: sp.yieldMl,
+                yieldOz: sp.yieldOz,
+                scoopType: sp.scoopType,
+                manualScoops: sp.manualScoops,
+                vessel: sp.vessel,
+                vesselSub: sp.vesselSub,
+                overflowMax: desiredMl > sp.yieldMl
+            };
+        }
+
+        const presets = CONFIG.cm401.presets;
+        for (const p of presets) {
+            const yMl = state.cm401Style === 'rich' ? p.richMl : p.classicMl;
+            const yOz = state.cm401Style === 'rich' ? p.richOz : p.classicOz;
+            if (yMl >= desiredMl) {
+                return {
+                    name: p.name,
+                    yieldMl: yMl,
+                    yieldOz: yOz,
+                    scoopType: p.scoopType,
+                    manualScoops: p.manualScoops,
+                    vessel: p.vessel,
+                    vesselSub: p.vesselSub,
+                    overflowMax: false
+                };
+            }
+        }
+
+        const maxP = presets[presets.length - 1];
+        return {
+            name: maxP.name,
+            yieldMl: state.cm401Style === 'rich' ? maxP.richMl : maxP.classicMl,
+            yieldOz: state.cm401Style === 'rich' ? maxP.richOz : maxP.classicOz,
+            scoopType: maxP.scoopType,
+            manualScoops: maxP.manualScoops,
+            vessel: maxP.vessel,
+            vesselSub: maxP.vesselSub,
+            overflowMax: true
+        };
+    }
+
+    // Calcula gramas compensando ~2ml/g retidos na borra
+    function calcCm401Coffee(yieldMl, ratio) {
+        const effectiveRatio = Math.max(ratio - 2, 1);
+        return roundBarista(yieldMl / effectiveRatio);
+    }
+
+    // Converte gramas para Ninja Smart Scoop e colheres de sopa (Tbsp)
+    function formatNinjaScoops(grams, scoopType) {
+        // 1 small scoop = 1 Tbsp (~6.25g) | 1 big scoop = 2 Tbsp (~12.5g)
+        const tbsp = grams / 6.25;
+        const scoops = scoopType === 'big' ? grams / 12.5 : tbsp;
+        const unitLabel = scoopType === 'big' ? 'big scoops' : 'small scoops';
+        return `${scoops.toFixed(1)} ${unitLabel} (${tbsp.toFixed(1)} Tbsp)`;
+    }
+
+    let lastEdited = 'volume';
 
     function onVolumeInput() {
         lastEdited = 'volume';
+        const mKey = state.method;
         const vol = parseFloat(document.getElementById('volume').value);
         const ratio = parseFloat(document.getElementById('ratio').value);
-        if (vol && ratio) {
+        if (!vol || !ratio) return;
+
+        if (mKey === 'cm401') {
+            const preset = resolveCm401Preset(vol);
+            document.getElementById('coffee').value = formatCoffee(calcCm401Coffee(preset.yieldMl, ratio));
+            if (document.getElementById('results').style.display === 'block') renderCm401();
+        } else {
             document.getElementById('coffee').value = formatCoffee(roundBarista(vol / ratio));
         }
     }
 
     function onCoffeeInput() {
         lastEdited = 'coffee';
+        const mKey = state.method;
         const coffee = parseFloat(document.getElementById('coffee').value);
         const ratio = parseFloat(document.getElementById('ratio').value);
-        if (coffee && ratio) {
+        if (!coffee || !ratio) return;
+
+        if (mKey === 'cm401') {
+            const expectedYield = Math.round(coffee * Math.max(ratio - 2, 1));
+            document.getElementById('volume').value = expectedYield;
+            if (document.getElementById('results').style.display === 'block') renderCm401();
+        } else {
             document.getElementById('volume').value = Math.round(coffee * ratio);
         }
     }
 
     function onRatioInput() {
+        const ratio = parseFloat(document.getElementById('ratio').value);
+        if (ratio && ratio > 0) {
+            const ratioKey = getRatioKey(state.method, state.cm401Style);
+            state.ratios[ratioKey] = ratio;
+            savePrefs();
+        }
+
         if (lastEdited === 'coffee') {
             onCoffeeInput();
         } else {
@@ -345,12 +652,90 @@
         }
     }
 
+    function renderCm401() {
+        const vol = parseFloat(document.getElementById('volume').value);
+        const ratio = parseFloat(document.getElementById('ratio').value) || CONFIG.cm401.defaultRatio;
+        if (!vol) return;
+
+        const preset = resolveCm401Preset(vol);
+        const coffee = calcCm401Coffee(preset.yieldMl, ratio);
+        const diffMl = preset.yieldMl - vol;
+        const injectedWater = Math.round(preset.yieldMl + (coffee * 2));
+        const minTankWater = injectedWater + 50; // ~50ml de reserva mínima no tanque
+
+        document.getElementById('n-style-badge').innerText = state.cm401Style.toUpperCase();
+        document.getElementById('n-func').innerText = preset.name;
+        document.getElementById('n-yield').innerText = `Produz ~${preset.yieldMl} ml`;
+
+        const diffText = diffMl > 0 ? `+${diffMl} ml acima do pedido` : `Volume exato`;
+        document.getElementById('n-yield-sub').innerText = `${preset.yieldOz.toFixed(1)} fl oz (manual) • ${diffText}`;
+
+        document.getElementById('n-coffee').innerText = `${formatCoffee(coffee)} g`;
+        document.getElementById('n-scoop').innerText = `${formatNinjaScoops(coffee, preset.scoopType)} • manual: ${preset.manualScoops}`;
+
+        document.getElementById('n-grind').innerText = CONFIG.cm401.grind;
+        document.getElementById('n-grind-sub').innerText = "Moagem média (padrão V60)";
+
+        document.getElementById('n-tank').innerText = `≥ ${minTankWater} ml`;
+        document.getElementById('n-tank-sub').innerText = `~${injectedWater} ml ciclo + ~50 ml reserva`;
+
+        document.getElementById('n-vessel').innerText = preset.vessel;
+        document.getElementById('n-vessel-sub').innerText = preset.vesselSub;
+
+        // Alertas de capacidade / transbordamento
+        const warnEl = document.getElementById('n-warning');
+        const warnings = [];
+        if (preset.overflowMax) {
+            warnings.push(`O volume pedido (${vol} ml) excede o máximo de 1 ciclo (${preset.yieldMl} ml).`);
+        }
+        if (coffee > 75) {
+            warnings.push(`Carga alta (${formatCoffee(coffee)} g): se notar drenagem lenta na jarra cheia, abra 1–2 clks para evitar transbordar o cesto.`);
+        }
+        if (warnings.length > 0) {
+            warnEl.innerText = warnings.join(' ');
+            warnEl.style.display = 'block';
+        } else {
+            warnEl.style.display = 'none';
+        }
+
+        // Checklist dinâmico
+        const steps = [
+            { k: "1. Seletor de Tamanho", v: preset.name },
+            { k: "2. Botão de Extração", v: state.cm401Style.toUpperCase() },
+            { k: "3. Trava Drip Stop", v: "Aberta (ícone gota)" }
+        ];
+
+        if (preset.id === 'half' || preset.id === 'full') {
+            steps.push({ k: "4. Placa Aquecedora", v: "Desligar Stay Warm se preferir" });
+        } else if (state.cm401Style === 'specialty') {
+            steps.push({ k: "4. Leite (Latte/Capp.)", v: `~${Math.round(preset.yieldMl * 1.5)}–${preset.yieldMl * 2} ml espumado` });
+        } else {
+            steps.push({ k: "4. Filtro", v: "Dourado permanente ou Papel nº 4" });
+        }
+
+        document.getElementById('n-table').innerHTML = steps.map(s => `
+            <tr><td>${s.k}</td><td class="val">${s.v}</td></tr>
+        `).join('');
+    }
+
     function calculate() {
         initAudio();
-        const mKey = document.getElementById('method').value;
+        const mKey = state.method;
         const vol = parseFloat(document.getElementById('volume').value);
         const ratio = parseFloat(document.getElementById('ratio').value);
         if (!vol) return;
+
+        if (mKey === 'cm401') {
+            document.getElementById('manual-results').style.display = 'none';
+            document.getElementById('cm401-results').style.display = 'block';
+            renderCm401();
+            document.getElementById('results').style.display = 'block';
+            return;
+        }
+
+        document.getElementById('cm401-results').style.display = 'none';
+        document.getElementById('manual-results').style.display = 'block';
+
         const conf = CONFIG[mKey];
         const coffee = roundBarista(vol / ratio);
         document.getElementById('r-coffee').innerText = formatCoffee(coffee) + "g";
@@ -367,11 +752,22 @@
     function clearAll() {
         document.getElementById('volume').value = "";
         document.getElementById('coffee').value = "";
-        updateDefaultRatio();
+
+        const ratioKey = getRatioKey(state.method, state.cm401Style);
+        state.ratios[ratioKey] = DEFAULT_RATIOS[ratioKey];
+        savePrefs();
+
+        applyMethodUI();
         document.getElementById('results').style.display = 'none';
         resetTimer();
     }
-    window.onload = updateDefaultRatio;
+
+    function initApp() {
+        loadPrefs();
+        applyMethodUI();
+    }
+
+    window.onload = initApp;
 </script>
 </body>
 </html>
