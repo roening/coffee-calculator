@@ -361,7 +361,7 @@
         v60: { 
             defaultRatio: 16, grind: "16 clks", temp: "93°C", time: "4:30", 
             targets: [30, 90, 145], 
-            finalSeconds: 270, // 4:30
+            finalSeconds: 270,
             getSteps: (v, coffee) => [
                 { t: "0:00 (Bloom)", val: Math.round(coffee * 2.5) },
                 { t: "0:30 (Vertida 2)", val: Math.round(v * 0.45) },
@@ -372,7 +372,7 @@
         french: { 
             defaultRatio: 13, grind: "23 clks", temp: "91°C", time: "4:00", 
             targets: [30], 
-            finalSeconds: 240, // 4:00
+            finalSeconds: 240,
             getSteps: (v, coffee) => [
                 { t: "0:00 (Início 50%)", val: Math.round(v * 0.50) },
                 { t: "0:30 (Completar)", val: v }
@@ -380,8 +380,8 @@
         },
         cm401: {
             grind: "16 clks",
-            // Todos os tamanhos calibrados para entregar ~1:16 no Classic
-            // e manter a mesma gramagem fixa por tamanho no modo Rich (como no manual)
+            // Cenário A: dose calibrada para 1:16 no Classic e mantida fixa no Rich,
+            // deixando a redução de água da máquina concentrar a bebida (1:14.4 a 1:15.2)
             presets: [
                 { id: "cup", name: "Cup", coffeeG: 20, classicMl: 281, classicOz: 9.5, richMl: 257, richOz: 8.7, scoopType: "small", manualScoops: "2–3 small", vessel: "Xícara", vesselSub: "Apoiar na bandeja" },
                 { id: "xl_cup", name: "XL Cup", coffeeG: 24.5, classicMl: 340, classicOz: 11.5, richMl: 305, richOz: 10.3, scoopType: "small", manualScoops: "2–3 small", vessel: "Caneca", vesselSub: "Apoiar na bandeja" },
@@ -726,7 +726,7 @@
 
         const warnEl = document.getElementById('n-warning');
         if (isMaxBasketLoad) {
-            warnEl.innerText = `Cesto no limite (${formatCoffee(coffee)} g para 1:16): use apenas o filtro dourado (sem papel), moagem 19–20 clks e encha o reservatório até o máximo.`;
+            warnEl.innerText = `Cesto no limite (${formatCoffee(coffee)} g): use apenas o filtro dourado (sem papel), moagem 19–20 clks e encha o reservatório até o máximo.`;
             warnEl.style.display = 'block';
         } else {
             warnEl.style.display = 'none';
